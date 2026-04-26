@@ -1,145 +1,197 @@
 import numpy as np
 import pandas as pd
+import matplotlib.pyplot as plt
 
 # 1.Display options
 pd.set_option('display.max_columns', None)
 pd.set_option('display.float_format', lambda x: '%.3f' % x)
 
 # 8。Load dataset
-# 1. 读取数据
 df = pd.read_csv(r"D:\python\新建文件夹\lab2\WorldEnergy.csv")
-# 2. 先打印所有列名
+# 打印所有列名
 print("="*30)
 print("DataFrame 所有列名：")
 print(df.columns.tolist())
 print("="*30)
-# 3. 再运行其他代码
 print("\n前5行数据：")
-print(df.head())# 1. 读取数据
+print(df.head())# 读取数据
 df = pd.read_csv(r"D:\python\新建文件夹\lab2\WorldEnergy.csv")
 
-# 9.Check structure and data types
-df.info()
-# Check for missing and duplicated records
-print("\nMissing values per column:")
-print(df.isnull().sum())
-print("\nDuplicated rows:", df.duplicated().sum())
+plt.rcParams["font.family"] = ["SimHei", "Arial Unicode MS"]
+plt.rcParams["axes.unicode_minus"] = False
 
-#10. Descriptive statistics for numeric columns
-df.describe()
-print("\nDescriptive statistics:\n", df.describe())
-
-#11. Frequency count for categorical variable 'country'
-print("\nDescriptive statistics:\n",df['country'].value_counts())
-
-# 12.Correlation between numeric features
-print("\nDescriptive statistics:\n",df.corr(numeric_only=True))
-
-#3-6 Group-wise average power consumption per country and population
-print("\nDescriptive statistics:\n",df.groupby('country')['population'].mean().sort_values(ascending=False))
-print("\nDescriptive statistics:\n",df.groupby('country')['population'].mean())
-
-#methodA
-# 1. 计算gdp列的均值和标准差（变量名和gdp对应，更清晰）
-mean_gdp = np.mean(df['gdp'])
-std_gdp = np.std(df['gdp'])
-# 2. 计算Z-score，新建一个列gdp_zscore存储，不覆盖原数据
-df['gdp_zscore'] = (df['gdp'] - mean_gdp) / std_gdp
-# 3. 筛选Z-score绝对值>3的异常值
-df_anomalies_z = df[np.abs(df['gdp_zscore']) > 3]
-# 4. 打印结果（脚本里必须用print！）
-print("Anomalies detected (gdp Z-score method):", len(df_anomalies_z))
-print("\nAnomaly data preview:")
-print(df_anomalies_z.head())
-print("输出methodA")
-
-#methodB
-Q1 = df['gdp'].quantile(0.25)
-Q3 = df['gdp'].quantile(0.75)
-IQR = Q3 - Q1
-lower_bound = Q1 - 1.5 * IQR
-upper_bound = Q3 + 1.5 * IQR
-df_anomalies_iqr = df[(df['gdp'] < lower_bound) | (df['gdp'] > upper_bound)]
-print("Anomalies detected (IQR method):", len(df_anomalies_iqr))
-print(df_anomalies_iqr.head())
-print("输出methodB")
-
-# 5.12 Count anomalies by machine
-print("\n异常值按 machine_id 统计：")
-print(df_anomalies_iqr['year'].value_counts())
-# Average power during anomaly by machine status
-print("\n异常值按 country 分组的 gdp 均值：")
-print(df_anomalies_iqr.groupby('country')['gdp'].mean())
-print("异常gdp")
-
-
-# 6.14Unique values in 'country'
-df['country'].unique()
-
-# 6.15Fill missing values with mean power
-df['gdp'] = df['gdp'].fillna(df['gdp'].mean())
-# Drop duplicates
-df.drop_duplicates(inplace=True)
-print("After cleaning:")
-print("Missing gdp values:", df['gdp'].isnull().sum())
-print("Total rows remaining:", len(df))
-print("输出gdp")
-
-#7总结
-summary = {
-    "Total Records": len(df),
-    "Missing Values (GDP)": df['gdp'].isnull().sum(),
-    "Outliers (IQR method on GDP)": len(df_anomalies_iqr),
-    "Mean GDP": round(df['gdp'].mean(), 2),
-    "GDP-Population Correlation": round(df['gdp'].corr(df['population']), 3),
-    "GDP-Wind Consumption Correlation": round(df['gdp'].corr(df['wind_consumption']), 3),
-}
-# print显示
-print("\n=== 数据总结报告 ===")
-print(pd.DataFrame(summary.items(), columns=["Metric", "Value"]))
-
-#分析图表
-import pandas as pd
-import seaborn as sns
-import matplotlib.pyplot as plt
-# Load dataset
 df = pd.read_csv(r"D:\python\新建文件夹\lab2\WorldEnergy.csv")
-df.head()
+
+# ======================  筛选中、韩、日数据 ======================
+country_list = ["China", "South Korea", "Japan", "中国", "韩国", "日本"]
+df_selected = df[df["country"].isin(country_list)].copy()
+
+df_china = df_selected[df_selected["country"].str.contains("China|中国", na=False)].dropna(subset=["gdp", "coal_prod_change_twh"])
+df_korea = df_selected[df_selected["country"].str.contains("South Korea|韩国", na=False)].dropna(subset=["gdp", "coal_prod_change_twh"])
+df_japan = df_selected[df_selected["country"].str.contains("Japan|日本", na=False)].dropna(subset=["gdp", "coal_prod_change_twh"])
+# 分别拆分三个国家的数据
+df_cn = df_selected[df_selected["country"].str.contains("China|中国", na=False)]
+df_kr = df_selected[df_selected["country"].str.contains("South Korea|韩国", na=False)]
+df_jp = df_selected[df_selected["country"].str.contains("Japan|日本", na=False)]
+
+# ======================  缺失值分析函数 ======================
+def calculate_missing_rate(data, country_name):
+    print(f"==================== {country_name} 缺失值分析 ====================")
+    missing_count = data.isnull().sum()
+    missing_percent = (missing_count / len(data)) * 100
+    missing_df = pd.DataFrame({
+        "缺失数量": missing_count,
+        "缺失占比(%)": missing_percent.round(2)
+    })
+    print(missing_df)
+    print("\n")
+
+# ======================  GDP统计函数 ======================
+def gdp_statistics(data, country_name):
+    print(f"==================== {country_name} GDP 统计指标 ====================")
+    if data.empty:
+        print("无有效GDP数据")
+    else:
+        print(f"GDP 均值：\t{data['gdp'].mean():.2f}")
+        print(f"GDP 最大值：\t{data['gdp'].max():.2f}")
+        print(f"GDP 最小值：\t{data['gdp'].min():.2f}")
+        print(f"GDP 标准差：\t{data['gdp'].std():.2f}")
+    print("-"*60, "\n")
+
+# ====================== coal_prod_change_twh 统计函数 ======================
+def coal_statistics(data, country_name):
+    print(f"==================== {country_name} coal_prod_change_twh 统计指标 ====================")
+    print("字段含义：煤炭产量变化量（单位：TWh）")
+    if data.empty:
+        print("无有效煤炭产量变化数据")
+    else:
+        print(f"均值：\t{data['coal_prod_change_twh'].mean():.2f}")
+        print(f"最大值：\t{data['coal_prod_change_twh'].max():.2f}")
+        print(f"最小值：\t{data['coal_prod_change_twh'].min():.2f}")
+        print(f"标准差：\t{data['coal_prod_change_twh'].std():.2f}")
+    print("-"*60, "\n")
+
+# 缺失值分析
+calculate_missing_rate(df_china, "中国")
+calculate_missing_rate(df_korea, "韩国")
+calculate_missing_rate(df_japan, "日本")
+
+#  GDP分国家统计
+gdp_statistics(df_china, "中国")
+gdp_statistics(df_korea, "韩国")
+gdp_statistics(df_japan, "日本")
 
 
-# 1.先按国家聚合GDP，取前10名
-gdp_by_country = df.groupby('country')['gdp'].sum().reset_index()
-gdp_by_country = gdp_by_country.sort_values('gdp', ascending=False).head(10)
+# ====================== GDP可视化图表 ======================
+countries = ["中国", "韩国", "日本"]
+gdp_mean = [df_china["gdp"].mean(), df_korea["gdp"].mean(), df_japan["gdp"].mean()]
+gdp_max = [df_china["gdp"].max(), df_korea["gdp"].max(), df_japan["gdp"].max()]
+gdp_min = [df_china["gdp"].min(), df_korea["gdp"].min(), df_japan["gdp"].min()]
+gdp_std = [df_china["gdp"].std(), df_korea["gdp"].std(), df_japan["gdp"].std()]
 
-plt.figure(figsize=(12, 6))
-sns.barplot(x='country', y='gdp', data=gdp_by_country, palette='viridis')
-plt.title('Top 10 Countries by Total GDP')
-plt.xlabel('Country')
-plt.ylabel('Total GDP')
-plt.xticks(rotation=45)
+# --- 图表1：三国GDP均值对比柱状图 ---
+plt.figure(figsize=(10, 5))
+plt.bar(countries, gdp_mean, color=["#1f77b4", "#ff7f0e", "#2ca02c"], width=0.5)
+plt.title("中国、韩国、日本 GDP 均值对比", fontsize=14)
+plt.ylabel("GDP 数值", fontsize=12)
+for i, v in enumerate(gdp_mean):
+    plt.text(i, v + max(gdp_mean)*0.01, f"{v:.2f}", ha="center")
 plt.tight_layout()
 plt.show()
 
-
-
-#2. Lineplot: Total GDP in different years
-sns.lineplot(x='year', y='gdp', data=df, errorbar=None)
-plt.title('Total GDP in different years')
+# --- 图表2：三国GDP 最大/最小/均值 对比图 ---
+x = np.arange(len(countries))
+width = 0.25
+plt.figure(figsize=(12, 6))
+plt.bar(x - width, gdp_max, width, label="GDP 最大值", color="#d62728")
+plt.bar(x, gdp_mean, width, label="GDP 均值", color="#1f77b4")
+plt.bar(x + width, gdp_min, width, label="GDP 最小值", color="#7f7f7f")
+plt.xlabel("国家", fontsize=12)
+plt.ylabel("GDP 数值", fontsize=12)
+plt.title("三国GDP 最大值、均值、最小值对比", fontsize=14)
+plt.xticks(x, countries)
+plt.legend()
+plt.tight_layout()
 plt.show()
 
-# Barplot: Top 10 Countries (GDP vs Population)
-# 1. 同时聚合GDP和人口，按GDP排序取前10
-gdp_by_country = df.groupby('country').agg(
-    gdp=('gdp', 'sum'),
-    population=('population', 'sum')
-).reset_index()
-gdp_by_country = gdp_by_country.sort_values('gdp', ascending=False).head(10)
-
-# 2. 画GDP柱状图 + 人口次轴线图（双指标同时展示）
-ax = sns.barplot(x='country', y='gdp', data=gdp_by_country, palette='muted', errorbar=None)
-ax2 = ax.twinx()  # 次坐标轴显示人口
-sns.lineplot(x='country', y='population', data=gdp_by_country, color='red', marker='o', ax=ax2)
-plt.xticks(rotation=45, ha='right')  # 国家名旋转避免重叠
-plt.title('GDP vs Population of Top 10 Countries by GDP')
-plt.tight_layout()  # 防止标签被截断
+# --- 图表3：GDP分布箱线图 ---
+plt.figure(figsize=(8, 5))
+gdp_data = [df_china["gdp"], df_korea["gdp"], df_japan["gdp"]]
+plt.boxplot(gdp_data, tick_labels=countries)
+plt.title("三国 GDP 分布箱线图", fontsize=14)
+plt.ylabel("GDP 数值", fontsize=12)
+plt.tight_layout()
 plt.show()
+
+# . coal_prod_change_twh
+coal_statistics(df_china, "中国")
+coal_statistics(df_korea, "韩国")
+coal_statistics(df_japan, "日本")
+countries = ["中国", "韩国", "日本"]
+# GDP数据
+gdp_mean = [df_china["gdp"].mean(), df_korea["gdp"].mean(), df_japan["gdp"].mean()]
+
+
+# 煤炭产量变化数据
+coal_mean = [df_china["coal_prod_change_twh"].mean(), df_korea["coal_prod_change_twh"].mean(), df_japan["coal_prod_change_twh"].mean()]
+coal_max = [df_china["coal_prod_change_twh"].max(), df_korea["coal_prod_change_twh"].max(), df_japan["coal_prod_change_twh"].max()]
+coal_min = [df_china["coal_prod_change_twh"].min(), df_korea["coal_prod_change_twh"].min(), df_japan["coal_prod_change_twh"].min()]
+
+# --- 图表1：均值对比 ---
+plt.figure(figsize=(10, 5))
+plt.bar(countries, coal_mean, color=["#ff9999", "#66b3ff", "#99ff99"], width=0.5)
+plt.title("中国、韩国、日本 coal_prod_change_twh 均值对比", fontsize=14)
+plt.ylabel("煤炭产量变化量（TWh）", fontsize=12)
+for i, v in enumerate(coal_mean):
+    plt.text(i, v+max(coal_mean)*0.01, f"{v:.2f}", ha="center")
+plt.tight_layout()
+plt.show()
+
+# --- 图表2：最大/均值/最小 对比 ---
+x = np.arange(len(countries))
+width = 0.25
+plt.figure(figsize=(12, 6))
+plt.bar(x-width, coal_max, width, label="最大值", color="#d62728")
+plt.bar(x, coal_mean, width, label="均值", color="#ff7f0e")
+plt.bar(x+width, coal_min, width, label="最小值", color="#1f77b4")
+plt.xlabel("国家", fontsize=12)
+plt.ylabel("煤炭产量变化量（TWh）", fontsize=12)
+plt.title("三国 coal_prod_change_twh 极值与均值对比", fontsize=14)
+plt.xticks(x, countries)
+plt.legend()
+plt.tight_layout()
+plt.show()
+
+# --- 图表3：分布箱线图 ---
+plt.figure(figsize=(8, 5))
+coal_data = [df_china["coal_prod_change_twh"], df_korea["coal_prod_change_twh"], df_japan["coal_prod_change_twh"]]
+plt.boxplot(coal_data, tick_labels=countries)
+plt.title("三国 coal_prod_change_twh 分布箱线图", fontsize=14)
+plt.ylabel("煤炭产量变化量（TWh）", fontsize=12)
+plt.tight_layout()
+plt.show()
+
+names = ["中国", "韩国", "日本"]
+gdp_mean = [df_cn["gdp"].mean(), df_kr["gdp"].mean(), df_jp["gdp"].mean()]
+coal_mean = [df_cn["coal_prod_change_twh"].mean(), df_kr["coal_prod_change_twh"].mean(), df_jp["coal_prod_change_twh"].mean()]
+pop_mean = [df_cn["population"].mean(), df_kr["population"].mean(), df_jp["population"].mean()]
+
+# --- 图表1：人口均值对比 ---
+plt.figure(figsize=(10, 5))
+plt.bar(names, pop_mean, color=["#FF6B6B", "#4ECDC4", "#45B7D1"])
+plt.title("中国、韩国、日本 平均人口对比", fontsize=14)
+plt.ylabel("人口数量", fontsize=12)
+for i, v in enumerate(pop_mean):
+    plt.text(i, v + max(pop_mean)*0.01, f"{v:.2f}", ha="center")
+plt.tight_layout()
+plt.show()
+
+# --- 图表2：人口分布箱线图 ---
+plt.figure(figsize=(8, 5))
+pop_data = [df_cn["population"].dropna(), df_kr["population"].dropna(), df_jp["population"].dropna()]
+plt.boxplot(pop_data, tick_labels=names)
+plt.title("三国人口数据分布箱线图", fontsize=14)
+plt.ylabel("人口数量", fontsize=12)
+plt.tight_layout()
+plt.show()
+
